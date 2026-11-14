@@ -133,7 +133,7 @@ public actor AssetMetadataExtractor {
                         if let fNumber = exif[kCGImagePropertyExifFNumber] as? Double {
                             snapshot.aperture = String(format: "%.1f", fNumber)
                         }
-                        if let focal = exif[kCGImagePropertyExifFocalLengthIn35mmFilm] as? Int {
+                        if let focal = exif[kCGImagePropertyExifFocalLenIn35mmFilm] as? Int {
                             snapshot.focalLength = "\(focal)mm"
                         } else if let focalRaw = exif[kCGImagePropertyExifFocalLength] as? Double {
                             snapshot.focalLength = String(format: "%.0fmm", focalRaw)
