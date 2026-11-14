@@ -298,6 +298,10 @@ public final class PhotoDeckQueryService: Sendable {
                 }
             }
             return PHAsset.fetchAssets(with: options)
+
+        case .googlePhotosAll, .googlePhotosAlbum:
+            options.predicate = NSPredicate(value: false)
+            return PHAsset.fetchAssets(with: options)
         }
     }
 
