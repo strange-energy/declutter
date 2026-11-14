@@ -1,0 +1,114 @@
+import SwiftUI
+
+/// Post-commit celebration screen displaying storage reclaimed in the current batch and cumulative lifetime stats (PRD Section 8 Milestone 2).
+public struct StorageCelebrationView: View {
+    public let receipt: BatchCommitReceipt
+    public let onDismiss: () -> Void
+
+    public init(receipt: BatchCommitReceipt, onDismiss: @escaping () -> Void) {
+        self.receipt = receipt
+        self.onDismiss = onDismiss
+    }
+
+    public var body: some View {
+        ZStack {
+            SwipeDeckTheme.backgroundPrimary
+                .ignoresSafeArea()
+
+            VStack(spacing: 28) {
+                Spacer()
+
+                ZStack {
+                    Circle()
+                        .fill(SwipeDeckTheme.accentKeep.opacity(0.16))
+                        .frame(width: 112, height: 112)
+                    Circle()
+                        .strokeBorder(SwipeDeckTheme.accentKeep.opacity(0.5), lineWidth: 2)
+                        .frame(width: 112, height: 112)
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 46, weight: .bold))
+                        .foregroundStyle(SwipeDeckTheme.accentKeep)
+                }
+
+                VStack(spacing: 10) {
+                    Text(receipt.formattedReclaimedSize)
+                        .font(SwipeDeckTypography.roundedTitle(44, weight: .heavy))
+                        .foregroundStyle(SwipeDeckTheme.accentKeep)
+
+                    Text("Storage Reclaimed!")
+                        .font(SwipeDeckTypography.roundedTitle(24, weight: .bold))
+                        .foregroundStyle(SwipeDeckTheme.textPrimary)
+
+                    Text("Moved \(receipt.deletedCount) clutter items to iOS Recently Deleted.")
+                        .font(SwipeDeckTypography.body(15))
+                        .foregroundStyle(SwipeDeckTheme.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+
+                // Cumulative Lifetime Telemetry Card
+                VStack(spacing: 14) {
+                    Text("LIFETIME IMPACT")
+                        .exifMonoStyle(size: 11, color: SwipeDeckTheme.textSecondary)
+
+                    HStack(spacing: 24) {
+                        statColumn(
+                            value: receipt.updatedLifetimeStats.formattedBytesReclaimed,
+                            label: "Total Saved"
+                        )
+                        Divider()
+                            .frame(height: 36)
+                            .overlay(SwipeDeckTheme.borderSubtle)
+                        statColumn(
+                            value: "\(receipt.updatedLifetimeStats.totalItemsDeleted)",
+                            label: "Items Trashed"
+                        )
+                        Divider()
+                            .frame(height: 36)
+                            .overlay(SwipeDeckTheme.borderSubtle)
+                        statColumn(
+                            value: "\(receipt.updatedLifetimeStats.totalAssetsKept)",
+                            label: "Curated Keeps"
+                        )
+                    }
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(SwipeDeckTheme.surfaceElevated)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .strokeBorder(SwipeDeckTheme.borderSubtle, lineWidth: 1)
+                        )
+                )
+                .padding(.horizontal, 24)
+
+                Spacer()
+
+                Button(action: onDismiss) {
+                    Text("Continue Decluttering")
+                        .font(SwipeDeckTypography.roundedHeadline(17, weight: .bold))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(SwipeDeckTheme.accentKeep, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 20)
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    @ViewBuilder
+    private func statColumn(value: String, label: String) -> some View {
+        VStack(spacing: 4) {
+            Text(value)
+                .roundedStatStyle(size: 18, color: SwipeDeckTheme.textPrimary)
+            Text(label)
+                .font(SwipeDeckTypography.body(12))
+                .foregroundStyle(SwipeDeckTheme.textSecondary)
+        }
+    }
+}
