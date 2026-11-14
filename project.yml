@@ -7,8 +7,7 @@ options:
   createIntermediateGroups: true
 settings:
   base:
-    SWIFT_VERSION: "6.0"
-    SWIFT_STRICT_CONCURRENCY: targeted
+    SWIFT_VERSION: "5.0"
     IPHONEOS_DEPLOYMENT_TARGET: "17.0"
     TARGETED_DEVICE_FAMILY: "1" # iPhone Native
 targets:
