@@ -48,8 +48,8 @@ public struct SwipeDeckApp: App {
                 }
             }
             .preferredColorScheme(.dark)
-            .task {
-                _ = await authService.requestAccessIfNeeded()
+            .onAppear {
+                authService.refreshStatus()
             }
         }
         .modelContainer(modelContainer)
@@ -131,18 +131,23 @@ private struct PhotoPermissionGateView: View {
                     .padding(.horizontal, 24)
                 } else {
                     Button {
-                        Task {
-                            _ = await authService.requestAccessIfNeeded()
-                        }
+                        authService.requestAccess()
                     } label: {
-                        Text("Allow Photo Library Access")
-                            .font(SwipeDeckTypography.roundedHeadline(17, weight: .bold))
-                            .foregroundStyle(.black)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(SwipeDeckTheme.accentKeep, in: Capsule())
+                        HStack(spacing: 8) {
+                            if authService.isRequestingPermission {
+                                ProgressView()
+                                    .tint(.black)
+                            }
+                            Text("Allow Photo Library Access")
+                                .font(SwipeDeckTypography.roundedHeadline(17, weight: .bold))
+                        }
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(SwipeDeckTheme.accentKeep, in: Capsule())
                     }
                     .buttonStyle(.plain)
+                    .disabled(authService.isRequestingPermission)
                     .padding(.horizontal, 24)
                 }
             }

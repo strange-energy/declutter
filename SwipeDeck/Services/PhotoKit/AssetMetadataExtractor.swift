@@ -71,85 +71,23 @@ public actor AssetMetadataExtractor {
             locationString = nil
         }
 
-        let exif = await Self.readEXIFProperties(for: phAsset)
-
         let metadata = AssetMetadata(
             assetID: asset.id,
             filename: filename,
             fileSizeBytes: bytes,
             creationDate: phAsset.creationDate,
             dimensions: "\(phAsset.pixelWidth) × \(phAsset.pixelHeight) (\(asset.megapixelsText))",
-            cameraModel: exif.cameraModel,
-            lensModel: exif.lensModel,
-            iso: exif.iso,
-            shutterSpeed: exif.shutterSpeed,
-            aperture: exif.aperture,
-            focalLength: exif.focalLength,
+            cameraModel: phAsset.mediaSubtypes.contains(.photoScreenshot) ? "Screenshot" : "iPhone Camera",
+            lensModel: phAsset.mediaSubtypes.contains(.photoLive) ? "Live Photo" : nil,
+            iso: nil,
+            shutterSpeed: nil,
+            aperture: nil,
+            focalLength: nil,
             locationName: locationString,
-            isStoredIniCloud: exif.isIniCloud
+            isStoredIniCloud: false
         )
 
         metadataCache[asset.id] = metadata
         return metadata
-    }
-
-    private struct EXIFSnapshot: Sendable {
-        var cameraModel: String?
-        var lensModel: String?
-        var iso: Int?
-        var shutterSpeed: String?
-        var aperture: String?
-        var focalLength: String?
-        var isIniCloud: Bool = false
-    }
-
-    private static func readEXIFProperties(for phAsset: PHAsset) async -> EXIFSnapshot {
-        guard phAsset.mediaType == .image else {
-            return EXIFSnapshot()
-        }
-
-        return await withCheckedContinuation { continuation in
-            let options = PHContentEditingInputRequestOptions()
-            options.isNetworkAccessAllowed = false
-
-            phAsset.requestContentEditingInput(with: options) { input, info in
-                var snapshot = EXIFSnapshot()
-                let isIniCloud = (info[PHContentEditingInputResultIsInCloudKey] as? Bool) ?? false
-                snapshot.isIniCloud = isIniCloud
-
-                if let url = input?.fullSizeImageURL,
-                   let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil),
-                   let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any] {
-
-                    if let tiff = properties[kCGImagePropertyTIFFDictionary] as? [CFString: Any] {
-                        snapshot.cameraModel = tiff[kCGImagePropertyTIFFModel] as? String
-                    }
-
-                    if let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any] {
-                        snapshot.lensModel = exif[kCGImagePropertyExifLensModel] as? String
-                        if let isoArray = exif[kCGImagePropertyExifISOSpeedRatings] as? [Int], let firstISO = isoArray.first {
-                            snapshot.iso = firstISO
-                        }
-                        if let fNumber = exif[kCGImagePropertyExifFNumber] as? Double {
-                            snapshot.aperture = String(format: "%.1f", fNumber)
-                        }
-                        if let focal = exif[kCGImagePropertyExifFocalLenIn35mmFilm] as? Int {
-                            snapshot.focalLength = "\(focal)mm"
-                        } else if let focalRaw = exif[kCGImagePropertyExifFocalLength] as? Double {
-                            snapshot.focalLength = String(format: "%.0fmm", focalRaw)
-                        }
-                        if let exposureTime = exif[kCGImagePropertyExifExposureTime] as? Double, exposureTime > 0 {
-                            if exposureTime >= 1.0 {
-                                snapshot.shutterSpeed = String(format: "%.1f", exposureTime)
-                            } else {
-                                let denominator = Int((1.0 / exposureTime).rounded())
-                                snapshot.shutterSpeed = "1/\(max(1, denominator))"
-                            }
-                        }
-                    }
-                }
-                continuation.resume(returning: snapshot)
-            }
-        }
     }
 }

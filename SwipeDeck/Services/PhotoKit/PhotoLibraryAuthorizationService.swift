@@ -14,6 +14,7 @@ public final class PhotoLibraryAuthorizationService {
     }
 
     public private(set) var accessState: AccessState = .notDetermined
+    public private(set) var isRequestingPermission = false
 
     public init() {
         refreshStatus()
@@ -24,17 +25,22 @@ public final class PhotoLibraryAuthorizationService {
         accessState = Self.mapStatus(status)
     }
 
-    public func requestAccessIfNeeded() async -> AccessState {
+    /// Requests Photo Library authorization on explicit user action (or checks existing status),
+    /// using the callback-based API dispatched back to `@MainActor` to avoid Swift concurrency suspension races.
+    public func requestAccess() {
         let current = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-        if current == .notDetermined {
-            let granted = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
-            let mapped = Self.mapStatus(granted)
-            self.accessState = mapped
-            return mapped
-        } else {
-            let mapped = Self.mapStatus(current)
-            self.accessState = mapped
-            return mapped
+        guard current == .notDetermined else {
+            accessState = Self.mapStatus(current)
+            return
+        }
+        guard !isRequestingPermission else { return }
+        isRequestingPermission = true
+
+        PHPhotoLibrary.requestAuthorization(for: .readWrite) { status in
+            Task { @MainActor in
+                self.isRequestingPermission = false
+                self.accessState = Self.mapStatus(status)
+            }
         }
     }
 

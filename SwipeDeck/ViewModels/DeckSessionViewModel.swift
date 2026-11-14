@@ -279,7 +279,7 @@ public final class DeckSessionViewModel {
     }
 
     private func refreshTopCardMetadataIfNeeded() {
-        guard let topAsset = currentTopAsset else {
+        guard isMetadataOverlayVisible, let topAsset = currentTopAsset else {
             activeCardMetadata = nil
             return
         }

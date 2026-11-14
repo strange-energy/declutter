@@ -6,20 +6,35 @@ import SwiftUI
 /// - Bottom Action Dock (10% Screen Height): Four circular glassmorphic buttons (`Undo`, `Trash`, `Skip`, `Keep`).
 public struct SwipeDeckView: View {
     @Environment(\.dismiss) private var dismiss
-    @Bindable public var sessionVM: DeckSessionViewModel
+    public let filter: DeckFilter
+    public let includePreviouslyKept: Bool
+    public let ledger: LedgerActor
     @Bindable public var trashVM: TrashStagingViewModel
     public let onSessionEnded: () -> Void
 
+    @State private var sessionVM: DeckSessionViewModel
     @State private var activeDragProgress: CGFloat = 0.0
 
     public init(
-        sessionVM: DeckSessionViewModel,
+        filter: DeckFilter,
+        includePreviouslyKept: Bool,
+        ledger: LedgerActor,
         trashVM: TrashStagingViewModel,
         onSessionEnded: @escaping () -> Void
     ) {
-        self.sessionVM = sessionVM
+        self.filter = filter
+        self.includePreviouslyKept = includePreviouslyKept
+        self.ledger = ledger
         self.trashVM = trashVM
         self.onSessionEnded = onSessionEnded
+        self._sessionVM = State(
+            initialValue: DeckSessionViewModel(
+                filter: filter,
+                includePreviouslyKept: includePreviouslyKept,
+                ledger: ledger,
+                trashVM: trashVM
+            )
+        )
     }
 
     public var body: some View {
