@@ -32,7 +32,7 @@ jobs:
 
       - name: Build Unsigned Release App for iOS Device (arm64)
         run: |
-          set -o pipefail
+          set +e
           xcodebuild build \
             -project SwipeDeck.xcodeproj \
             -scheme SwipeDeck \
@@ -45,7 +45,15 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            2>&1 | tee xcodebuild.log
+            > xcodebuild.log 2>&1
+          EXIT_CODE=$?
+          if [ $EXIT_CODE -ne 0 ]; then
+            grep -E "(error:|fatal error:)" xcodebuild.log | head -n 30 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+            tail -n 80 xcodebuild.log
+            exit $EXIT_CODE
+          fi
 
       - name: Upload Build Log on Failure
         if: failure()
