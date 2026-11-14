@@ -141,48 +141,87 @@ public struct HomeDashboardView: View {
         }
     }
 
-    // MARK: - 2. Hero Primary Action Card
+    // MARK: - 2. Hero Primary Action Card + Companion Avatar
 
     private var primaryQuickStartCard: some View {
-        Button {
-            selectedDeckFilter = .allPhotos
-        } label: {
+        let companion = dashboardVM.lifetimeStats.companionProgress
+
+        return VStack(spacing: 14) {
             HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("START SWIPING")
-                        .exifMonoStyle(size: 11, color: SwipeDeckTheme.accentKeep)
+                CompanionAvatarView(
+                    progress: companion,
+                    containerSize: 70,
+                    isInteractive: true
+                )
 
-                    Text("Recent Camera Roll")
-                        .font(SwipeDeckTypography.roundedTitle(22, weight: .bold))
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text("LVL \(companion.stage.rawValue) • \(companion.stage.title.uppercased())")
+                            .exifMonoStyle(size: 10, color: companion.stage.primaryColor)
+
+                        Spacer()
+
+                        if let remaining = companion.xpRemainingToNextStage {
+                            Text("\(remaining) swipes to evolve")
+                                .exifMonoStyle(size: 10, color: SwipeDeckTheme.textTertiary)
+                        } else {
+                            Text("MAX STAGE")
+                                .exifMonoStyle(size: 10, color: SwipeDeckTheme.accentUndo)
+                        }
+                    }
+
+                    Text(companion.stage.encouragementLine)
+                        .font(SwipeDeckTypography.roundedHeadline(14, weight: .semibold))
                         .foregroundStyle(SwipeDeckTheme.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                    Text("Jump straight into your latest photos & videos.")
-                        .font(SwipeDeckTypography.body(13))
+                    Text("\(companion.totalSwipes) photos reviewed • Tap avatar to bounce")
+                        .font(SwipeDeckTypography.body(12))
                         .foregroundStyle(SwipeDeckTheme.textSecondary)
                 }
+            }
 
-                Spacer()
+            Divider()
+                .overlay(SwipeDeckTheme.borderSubtle)
 
-                ZStack {
-                    Circle()
-                        .fill(SwipeDeckTheme.accentKeep)
-                        .frame(width: 48, height: 48)
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(.black)
+            Button {
+                selectedDeckFilter = .allPhotos
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Recent Camera Roll")
+                            .font(SwipeDeckTypography.roundedHeadline(17, weight: .bold))
+                            .foregroundStyle(SwipeDeckTheme.textPrimary)
+                        Text("Jump straight into your latest photos & videos")
+                            .font(SwipeDeckTypography.body(12))
+                            .foregroundStyle(SwipeDeckTheme.textSecondary)
+                    }
+
+                    Spacer()
+
+                    HStack(spacing: 6) {
+                        Text("Swipe")
+                            .font(SwipeDeckTypography.roundedHeadline(14, weight: .bold))
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 12, weight: .bold))
+                    }
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(SwipeDeckTheme.accentKeep, in: Capsule())
                 }
             }
-            .padding(20)
-            .background(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(SwipeDeckTheme.surfaceElevated)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 22, style: .continuous)
-                            .strokeBorder(SwipeDeckTheme.accentKeep.opacity(0.45), lineWidth: 1.5)
-                    )
-            )
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(SwipeDeckTheme.surfaceElevated)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .strokeBorder(companion.stage.primaryColor.opacity(0.42), lineWidth: 1.5)
+                )
+        )
     }
 
     // MARK: - 3. Segmented Tab Bar

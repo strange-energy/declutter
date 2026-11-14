@@ -24,7 +24,7 @@ public struct SwipeCardView: View {
 
     // Gesture states
     @State private var dragOffset: CGSize = .zero
-    @State private var zoomScale: CGFloat = 1.0
+    @State private var isPinchZooming = false
     @State private var hasRequestedHighResZoom = false
 
     private var isTopCard: Bool { stackDepth == 0 }
@@ -69,16 +69,29 @@ public struct SwipeCardView: View {
                         y: 6
                     )
 
-                // Media Content (Aspect-Fit Image or Muted Autoplay Video)
+                // Media Content (Aspect-Fit Image with Focal-Point Pinch Zoom or Muted Autoplay Video)
                 ZStack {
                     if isTopCard && asset.kind == .video {
                         LivePhotoVideoPlayerView(asset: asset, isAudioMuted: $isAudioMuted)
                     } else if let image = highResZoomImage ?? displayImage {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFit()
-                            .scaleEffect(isTopCard ? zoomScale : 1.0)
+                        if isTopCard {
+                            FocalPinchZoomImageView(
+                                image: image,
+                                isZooming: $isPinchZooming,
+                                onHighResThresholdReached: {
+                                    requestHighResZoomUpgradeIfNeeded()
+                                },
+                                onSingleTap: {
+                                    onSingleTap()
+                                }
+                            )
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
                     } else {
                         ProgressView()
                             .tint(.white)
@@ -87,7 +100,7 @@ public struct SwipeCardView: View {
                 .clipShape(RoundedRectangle(cornerRadius: SwipeDeckTheme.cardCornerRadius, style: .continuous))
 
                 // Subtle iCloud streaming spinner when zooming in on an uncached asset (PRD Section 7)
-                if isTopCard && isStreamingFromiCloud && zoomScale > 1.05 {
+                if isTopCard && isStreamingFromiCloud && isPinchZooming {
                     VStack {
                         HStack {
                             Spacer()
@@ -147,12 +160,13 @@ public struct SwipeCardView: View {
                 anchor: .bottom
             )
             .contentShape(RoundedRectangle(cornerRadius: SwipeDeckTheme.cardCornerRadius, style: .continuous))
-            .onTapGesture {
-                guard isTopCard else { return }
-                onSingleTap()
-            }
             .gesture(isTopCard ? dragGesture(in: geo.size) : nil)
-            .simultaneousGesture(isTopCard ? magnificationGesture : nil)
+        }
+        .onChange(of: isPinchZooming) { _, zooming in
+            if !zooming {
+                highResZoomImage = nil
+                hasRequestedHighResZoom = false
+            }
         }
         .task(id: asset.id) {
             loadScreenSizeImage()
@@ -248,9 +262,9 @@ public struct SwipeCardView: View {
     // MARK: - Drag & Pinch-to-Zoom Gestures
 
     private func dragGesture(in containerSize: CGSize) -> some Gesture {
-        DragGesture(minimumDistance: 6, coordinateSpace: .local)
+        DragGesture(minimumDistance: 10, coordinateSpace: .local)
             .onChanged { value in
-                guard zoomScale <= 1.02 else { return }
+                guard !isPinchZooming else { return }
                 dragOffset = value.translation
 
                 let progress = min(1.0, currentThresholdProgress)
@@ -298,34 +312,18 @@ public struct SwipeCardView: View {
             }
     }
 
-    private var magnificationGesture: some Gesture {
-        MagnificationGesture()
-            .onChanged { scale in
-                let clamped = min(4.5, max(1.0, scale))
-                zoomScale = clamped
-
-                // PRD Section 7: Only decode full high-res buffer if user pinches past 200% zoom
-                if clamped >= 2.0 && !hasRequestedHighResZoom {
-                    hasRequestedHighResZoom = true
-                    AssetPrefetchPipeline.shared.requestCardImage(
-                        for: asset.id,
-                        highResolutionForZoom: true
-                    ) { highRes, inCloud in
-                        self.isStreamingFromiCloud = inCloud
-                        if let highRes {
-                            self.highResZoomImage = highRes
-                        }
-                    }
-                }
+    private func requestHighResZoomUpgradeIfNeeded() {
+        guard !hasRequestedHighResZoom else { return }
+        hasRequestedHighResZoom = true
+        AssetPrefetchPipeline.shared.requestCardImage(
+            for: asset.id,
+            highResolutionForZoom: true
+        ) { highRes, inCloud in
+            self.isStreamingFromiCloud = inCloud
+            if let highRes {
+                self.highResZoomImage = highRes
             }
-            .onEnded { _ in
-                withAnimation(.spring(response: SwipeDeckTheme.springResponse, dampingFraction: SwipeDeckTheme.springDamping)) {
-                    zoomScale = 1.0
-                }
-                // Release raw high-res buffer once snapped back to 1.0x to respect memory ceiling
-                highResZoomImage = nil
-                hasRequestedHighResZoom = false
-            }
+        }
     }
 
     private func executeFlyOffAndCommit(action: SwipeAction, containerSize: CGSize) {

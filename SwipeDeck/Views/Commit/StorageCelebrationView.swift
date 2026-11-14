@@ -15,20 +15,14 @@ public struct StorageCelebrationView: View {
             SwipeDeckTheme.backgroundPrimary
                 .ignoresSafeArea()
 
-            VStack(spacing: 28) {
+            VStack(spacing: 26) {
                 Spacer()
 
-                ZStack {
-                    Circle()
-                        .fill(SwipeDeckTheme.accentKeep.opacity(0.16))
-                        .frame(width: 112, height: 112)
-                    Circle()
-                        .strokeBorder(SwipeDeckTheme.accentKeep.opacity(0.5), lineWidth: 2)
-                        .frame(width: 112, height: 112)
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 46, weight: .bold))
-                        .foregroundStyle(SwipeDeckTheme.accentKeep)
-                }
+                CompanionAvatarView(
+                    progress: receipt.updatedLifetimeStats.companionProgress,
+                    containerSize: 108,
+                    isInteractive: true
+                )
 
                 VStack(spacing: 10) {
                     Text(receipt.formattedReclaimedSize)

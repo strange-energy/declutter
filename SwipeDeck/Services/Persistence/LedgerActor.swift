@@ -23,9 +23,22 @@ public struct LifetimeStatsSnapshot: Equatable, Sendable {
     public let totalBytesReclaimed: Int64
     public let totalAssetsKept: Int
     public let totalSessionsCompleted: Int
+    public let currentStagedCount: Int
 
     public var totalItemsDeleted: Int {
         totalPhotosDeleted + totalVideosDeleted
+    }
+
+    /// Total swipes/reviews across the app's lifetime (Kept + Deleted + Currently Staged).
+    public var totalUsageSwipes: Int {
+        totalAssetsKept + totalItemsDeleted + currentStagedCount
+    }
+
+    public var companionProgress: AvatarCompanionProgress {
+        AvatarCompanionProgress(
+            totalSwipes: totalUsageSwipes,
+            sessionsCompleted: totalSessionsCompleted
+        )
     }
 
     public var formattedBytesReclaimed: String {
@@ -37,13 +50,15 @@ public struct LifetimeStatsSnapshot: Equatable, Sendable {
         totalVideosDeleted: Int = 0,
         totalBytesReclaimed: Int64 = 0,
         totalAssetsKept: Int = 0,
-        totalSessionsCompleted: Int = 0
+        totalSessionsCompleted: Int = 0,
+        currentStagedCount: Int = 0
     ) {
         self.totalPhotosDeleted = totalPhotosDeleted
         self.totalVideosDeleted = totalVideosDeleted
         self.totalBytesReclaimed = totalBytesReclaimed
         self.totalAssetsKept = totalAssetsKept
         self.totalSessionsCompleted = totalSessionsCompleted
+        self.currentStagedCount = currentStagedCount
     }
 }
 
@@ -221,12 +236,17 @@ public actor LedgerActor {
         stats.lastUpdated = .now
 
         try modelContext.save()
-        return snapshot(from: stats)
+        return snapshot(from: stats, stagedCount: 0)
     }
 
     public func fetchLifetimeStats() throws -> LifetimeStatsSnapshot {
         let stats = try fetchOrCreateStatsRecord()
-        return snapshot(from: stats)
+        let stagedRaw = ReviewedAssetRecord.Disposition.stagedTrash.rawValue
+        let stagedDescriptor = FetchDescriptor<ReviewedAssetRecord>(
+            predicate: #Predicate { $0.dispositionRaw == stagedRaw }
+        )
+        let stagedCount = (try? modelContext.fetchCount(stagedDescriptor)) ?? 0
+        return snapshot(from: stats, stagedCount: stagedCount)
     }
 
     private func fetchOrCreateStatsRecord() throws -> LifetimeStatsRecord {
@@ -242,13 +262,14 @@ public actor LedgerActor {
         return created
     }
 
-    private func snapshot(from record: LifetimeStatsRecord) -> LifetimeStatsSnapshot {
+    private func snapshot(from record: LifetimeStatsRecord, stagedCount: Int) -> LifetimeStatsSnapshot {
         LifetimeStatsSnapshot(
             totalPhotosDeleted: record.totalPhotosDeleted,
             totalVideosDeleted: record.totalVideosDeleted,
             totalBytesReclaimed: record.totalBytesReclaimed,
             totalAssetsKept: record.totalAssetsKept,
-            totalSessionsCompleted: record.totalSessionsCompleted
+            totalSessionsCompleted: record.totalSessionsCompleted,
+            currentStagedCount: stagedCount
         )
     }
 }
