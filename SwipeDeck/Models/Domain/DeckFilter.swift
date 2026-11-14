@@ -18,6 +18,19 @@ public enum DeckFilter: Hashable, Codable, Identifiable, Sendable {
     // MARK: - Smart Storage Sieves
     case heavyHitters // Videos and photos sorted by file size (largest first)
 
+    // MARK: - Google Photos Cloud Companion (Milestone 3B)
+    case googlePhotosAll
+    case googlePhotosAlbum(albumID: String, title: String)
+
+    public var isGooglePhotosDeck: Bool {
+        switch self {
+        case .googlePhotosAll, .googlePhotosAlbum:
+            return true
+        default:
+            return false
+        }
+    }
+
     public var id: String {
         switch self {
         case .allPhotos:
@@ -40,6 +53,10 @@ public enum DeckFilter: Hashable, Codable, Identifiable, Sendable {
             return "timeframe_range_\(Int(start.timeIntervalSince1970))_\(Int(end.timeIntervalSince1970))"
         case .heavyHitters:
             return "sieve_heavy_hitters"
+        case .googlePhotosAll:
+            return "gphoto_all_cloud"
+        case .googlePhotosAlbum(let albumID, _):
+            return "gphoto_album_\(albumID)"
         }
     }
 
@@ -74,6 +91,10 @@ public enum DeckFilter: Hashable, Codable, Identifiable, Sendable {
             return "\(startStr) – \(endStr)"
         case .heavyHitters:
             return "Heavy Hitters"
+        case .googlePhotosAll:
+            return "Google Photos Stream"
+        case .googlePhotosAlbum(_, let title):
+            return title
         }
     }
 
@@ -99,6 +120,10 @@ public enum DeckFilter: Hashable, Codable, Identifiable, Sendable {
             return "Targeted date window"
         case .heavyHitters:
             return "Largest videos & photos first"
+        case .googlePhotosAll:
+            return "Cloud library triage"
+        case .googlePhotosAlbum:
+            return "Google Photos cloud folder"
         }
     }
 
@@ -124,6 +149,8 @@ public enum DeckFilter: Hashable, Codable, Identifiable, Sendable {
             return "calendar.day.timeline.left"
         case .heavyHitters:
             return "externaldrive.fill.badge.timemachine"
+        case .googlePhotosAll, .googlePhotosAlbum:
+            return "cloud.fill"
         }
     }
 }

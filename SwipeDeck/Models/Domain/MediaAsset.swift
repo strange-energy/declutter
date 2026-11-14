@@ -9,7 +9,7 @@ public struct MediaAsset: Identifiable, Hashable, Sendable {
         case video
     }
 
-    /// The `PHAsset.localIdentifier` (or Google Photos mediaItem ID in Secondary Cloud Companion Mode).
+    /// The `PHAsset.localIdentifier` (or `"gphoto_<mediaItemId>"` in Google Photos Cloud Companion Mode).
     public let id: String
     public let kind: Kind
     public let creationDate: Date?
@@ -19,6 +19,16 @@ public struct MediaAsset: Identifiable, Hashable, Sendable {
     public let isFavorite: Bool
     /// Estimated or extracted byte size on disk (`PHAssetResource`).
     public var fileSizeBytes: Int64
+    /// Optional remote base URL for Google Photos cloud-only assets.
+    public let remoteBaseURL: String?
+    /// Optional Google Photos web product URL (allows opening the exact photo in the Google Photos app).
+    public let remoteProductURL: String?
+    /// Optional Google Photos media item raw ID.
+    public let googleMediaItemID: String?
+
+    public var isGooglePhotoAsset: Bool {
+        googleMediaItemID != nil || id.hasPrefix("gphoto_")
+    }
 
     public init(
         id: String,
@@ -28,7 +38,10 @@ public struct MediaAsset: Identifiable, Hashable, Sendable {
         pixelHeight: Int,
         duration: TimeInterval = 0,
         isFavorite: Bool = false,
-        fileSizeBytes: Int64 = 0
+        fileSizeBytes: Int64 = 0,
+        remoteBaseURL: String? = nil,
+        remoteProductURL: String? = nil,
+        googleMediaItemID: String? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -38,6 +51,9 @@ public struct MediaAsset: Identifiable, Hashable, Sendable {
         self.duration = duration
         self.isFavorite = isFavorite
         self.fileSizeBytes = fileSizeBytes
+        self.remoteBaseURL = remoteBaseURL
+        self.remoteProductURL = remoteProductURL
+        self.googleMediaItemID = googleMediaItemID
     }
 
     public init(phAsset: PHAsset, estimatedBytes: Int64 = 0) {
@@ -55,6 +71,9 @@ public struct MediaAsset: Identifiable, Hashable, Sendable {
         self.duration = phAsset.duration
         self.isFavorite = phAsset.isFavorite
         self.fileSizeBytes = estimatedBytes
+        self.remoteBaseURL = nil
+        self.remoteProductURL = nil
+        self.googleMediaItemID = nil
     }
 
     public var resolutionText: String {

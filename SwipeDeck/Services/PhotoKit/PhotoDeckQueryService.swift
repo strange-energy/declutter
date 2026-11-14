@@ -32,6 +32,21 @@ public final class PhotoDeckQueryService: Sendable {
         excludedAssetIDs: Set<String>,
         maxSessionSize: Int = 300
     ) async -> [MediaAsset] {
+        switch filter {
+        case .googlePhotosAll:
+            return await GooglePhotosCloudService.shared.fetchMediaAssets(
+                albumID: nil,
+                excludedAssetIDs: excludedAssetIDs
+            )
+        case .googlePhotosAlbum(let albumID, _):
+            return await GooglePhotosCloudService.shared.fetchMediaAssets(
+                albumID: albumID,
+                excludedAssetIDs: excludedAssetIDs
+            )
+        default:
+            break
+        }
+
         return await Task.detached(priority: .userInitiated) {
             let phAssets = Self.fetchPHAssets(for: filter)
             let count = phAssets.count

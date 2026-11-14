@@ -18,6 +18,7 @@ public struct HomeDashboardView: View {
     @State private var selectedDeckFilter: DeckFilter?
     @State private var activeTab: DeckTab = .months
     @State private var isShowingSettingsSheet = false
+    @State private var googleService = GooglePhotosCloudService.shared
 
     private let gridColumns = [
         GridItem(.flexible(), spacing: 12),
@@ -95,6 +96,9 @@ public struct HomeDashboardView: View {
             .task {
                 await trashVM.reloadFromLedger()
                 await dashboardVM.refreshDashboard()
+                if googleService.isConnected {
+                    await googleService.fetchAlbums()
+                }
             }
         }
         .preferredColorScheme(.dark)
@@ -316,17 +320,94 @@ public struct HomeDashboardView: View {
     }
 
     private var albumsSectionView: some View {
-        Group {
-            if dashboardVM.userAlbumDecks.isEmpty {
-                emptySectionPlaceholder(text: "No custom albums found in your Photo Library.")
-            } else {
-                LazyVGrid(columns: gridColumns, spacing: 12) {
-                    ForEach(dashboardVM.userAlbumDecks) { albumSummary in
-                        DeckSummaryCardView(summary: albumSummary) {
-                            selectedDeckFilter = albumSummary.filter
+        VStack(alignment: .leading, spacing: 18) {
+            // 1. Optional Google Photos Folders (Only visible if the user chose to connect their Google account)
+            if googleService.isConnected {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Label("GOOGLE PHOTOS FOLDERS", systemImage: "cloud.fill")
+                            .exifMonoStyle(size: 11, color: SwipeDeckTheme.accentDefer)
+                        Spacer()
+                        Button {
+                            Task { await googleService.fetchAlbums() }
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(SwipeDeckTheme.textSecondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    LazyVGrid(columns: gridColumns, spacing: 12) {
+                        // Main Google Photos Cloud Stream card
+                        DeckSummaryCardView(
+                            summary: DeckSummaryItem(
+                                filter: .googlePhotosAll,
+                                unreviewedCount: 100,
+                                totalCount: 100,
+                                coverAssetID: nil
+                            )
+                        ) {
+                            selectedDeckFilter = .googlePhotosAll
+                        }
+
+                        // Individual Google Photos Albums/Folders
+                        ForEach(googleService.albums) { gAlbum in
+                            DeckSummaryCardView(
+                                summary: DeckSummaryItem(
+                                    filter: .googlePhotosAlbum(albumID: gAlbum.id, title: gAlbum.title),
+                                    unreviewedCount: gAlbum.mediaItemsCount,
+                                    totalCount: gAlbum.mediaItemsCount,
+                                    coverAssetID: "gphoto_cover_\(gAlbum.id)"
+                                )
+                            ) {
+                                selectedDeckFilter = .googlePhotosAlbum(albumID: gAlbum.id, title: gAlbum.title)
+                            }
                         }
                     }
                 }
+            }
+
+            // 2. Local iPhone User Albums
+            VStack(alignment: .leading, spacing: 10) {
+                if googleService.isConnected {
+                    Text("LOCAL IPHONE ALBUMS")
+                        .exifMonoStyle(size: 11, color: SwipeDeckTheme.textSecondary)
+                }
+
+                if dashboardVM.userAlbumDecks.isEmpty {
+                    emptySectionPlaceholder(text: "No custom albums found in your Photo Library.")
+                } else {
+                    LazyVGrid(columns: gridColumns, spacing: 12) {
+                        ForEach(dashboardVM.userAlbumDecks) { albumSummary in
+                            DeckSummaryCardView(summary: albumSummary) {
+                                selectedDeckFilter = albumSummary.filter
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. Subtle non-intrusive link if not connected
+            if !googleService.isConnected {
+                Button {
+                    isShowingSettingsSheet = true
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "cloud.fill")
+                            .foregroundStyle(SwipeDeckTheme.accentDefer)
+                        Text("Have cloud-only Google Photos? Connect in Settings")
+                            .font(SwipeDeckTypography.body(13))
+                            .foregroundStyle(SwipeDeckTheme.textSecondary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(SwipeDeckTheme.textTertiary)
+                    }
+                    .padding(14)
+                    .background(SwipeDeckTheme.surfaceElevated, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -379,6 +460,99 @@ public struct HomeDashboardView: View {
                     .padding(16)
                     .background(SwipeDeckTheme.surfaceElevated, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
 
+                    // Optional Google Photos Cloud Companion Card (Non-intrusive, inside Settings)
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "cloud.fill")
+                                .foregroundStyle(SwipeDeckTheme.accentDefer)
+                            Text("Google Photos Cloud Companion")
+                                .font(SwipeDeckTypography.roundedHeadline(16, weight: .bold))
+                                .foregroundStyle(SwipeDeckTheme.textPrimary)
+                            Spacer()
+                            if googleService.isConnected {
+                                Text("Connected")
+                                    .exifMonoStyle(size: 11, color: SwipeDeckTheme.accentKeep)
+                            } else {
+                                Text("Optional")
+                                    .exifMonoStyle(size: 11, color: SwipeDeckTheme.textTertiary)
+                            }
+                        }
+
+                        Text("Connect to browse Google Photos folders and stage cloud-only items into '\(GooglePhotosCloudService.stagingAlbumTitle)' for rapid cleanup.")
+                            .font(SwipeDeckTypography.body(12))
+                            .foregroundStyle(SwipeDeckTheme.textSecondary)
+
+                        if googleService.isConnected {
+                            HStack(spacing: 12) {
+                                Button {
+                                    isShowingSettingsSheet = false
+                                    activeTab = .albums
+                                } label: {
+                                    Text("Browse Cloud Folders (\(googleService.albums.count))")
+                                        .font(SwipeDeckTypography.roundedHeadline(14, weight: .bold))
+                                        .foregroundStyle(.black)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 11)
+                                        .background(SwipeDeckTheme.accentKeep, in: Capsule())
+                                }
+                                .buttonStyle(.plain)
+
+                                Button {
+                                    googleService.disconnectAccount()
+                                } label: {
+                                    Text("Disconnect")
+                                        .font(SwipeDeckTypography.roundedHeadline(14, weight: .semibold))
+                                        .foregroundStyle(SwipeDeckTheme.accentDelete)
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 11)
+                                        .background(SwipeDeckTheme.surfaceSecondary, in: Capsule())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        } else {
+                            TextField("iOS Google OAuth Client ID", text: $googleService.clientID)
+                                .exifMonoStyle(size: 12, color: SwipeDeckTheme.textPrimary)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .padding(12)
+                                .background(SwipeDeckTheme.surfaceSecondary, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+                            if let statusMsg = googleService.statusMessage {
+                                Text(statusMsg)
+                                    .font(SwipeDeckTypography.body(11))
+                                    .foregroundStyle(SwipeDeckTheme.accentDelete)
+                            }
+
+                            Button {
+                                Task {
+                                    do {
+                                        try await googleService.signInWithGoogle()
+                                    } catch {
+                                        googleService.statusMessage = error.localizedDescription
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    if googleService.isAuthenticating {
+                                        ProgressView().tint(.white)
+                                    } else {
+                                        Image(systemName: "person.badge.key.fill")
+                                    }
+                                    Text("Connect Google Photos Account")
+                                        .font(SwipeDeckTypography.roundedHeadline(14, weight: .bold))
+                                }
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(SwipeDeckTheme.accentDefer, in: Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(googleService.isAuthenticating)
+                        }
+                    }
+                    .padding(16)
+                    .background(SwipeDeckTheme.surfaceElevated, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+
                     Spacer()
                 }
                 .padding(20)
@@ -395,7 +569,7 @@ public struct HomeDashboardView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
     }
 }
 

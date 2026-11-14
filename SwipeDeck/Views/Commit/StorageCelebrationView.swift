@@ -79,6 +79,30 @@ public struct StorageCelebrationView: View {
 
                 Spacer()
 
+                if let googleURL = receipt.googlePhotosTrashAlbumURL, receipt.cloudStagedCount > 0 {
+                    Button {
+                        UIApplication.shared.open(googleURL)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.up.right.square.fill")
+                            Text("Open '\(GooglePhotosCloudService.stagingAlbumTitle)' in Google Photos")
+                                .font(SwipeDeckTypography.roundedHeadline(14, weight: .bold))
+                        }
+                        .foregroundStyle(SwipeDeckTheme.accentDefer)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            Capsule()
+                                .fill(SwipeDeckTheme.accentDefer.opacity(0.15))
+                                .overlay(
+                                    Capsule().strokeBorder(SwipeDeckTheme.accentDefer.opacity(0.5), lineWidth: 1)
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 24)
+                }
+
                 Button(action: onDismiss) {
                     Text("Continue Decluttering")
                         .font(SwipeDeckTypography.roundedHeadline(17, weight: .bold))

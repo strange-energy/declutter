@@ -7,9 +7,27 @@ public struct BatchCommitReceipt: Identifiable, Equatable, Sendable {
     public let deletedCount: Int
     public let reclaimedBytes: Int64
     public let updatedLifetimeStats: LifetimeStatsSnapshot
+    /// Optional Google Photos album URL if any cloud-only items were staged to `"To Delete - SwipeDeck"`
+    /// so the user can open Google Photos in one tap to empty them.
+    public let googlePhotosTrashAlbumURL: URL?
+    public let cloudStagedCount: Int
 
     public var formattedReclaimedSize: String {
         ByteCountFormatter.string(fromByteCount: reclaimedBytes, countStyle: .file)
+    }
+
+    public init(
+        deletedCount: Int,
+        reclaimedBytes: Int64,
+        updatedLifetimeStats: LifetimeStatsSnapshot,
+        googlePhotosTrashAlbumURL: URL? = nil,
+        cloudStagedCount: Int = 0
+    ) {
+        self.deletedCount = deletedCount
+        self.reclaimedBytes = reclaimedBytes
+        self.updatedLifetimeStats = updatedLifetimeStats
+        self.googlePhotosTrashAlbumURL = googlePhotosTrashAlbumURL
+        self.cloudStagedCount = cloudStagedCount
     }
 }
 
@@ -157,9 +175,22 @@ public final class TrashStagingViewModel {
                 try? await ledger.removeDisposition(assetID: rescuedID)
             }
 
-            // 2. Trigger single native iOS PHAssetChangeRequest.deleteAssets confirmation
+            // 2. Separate local Apple PhotoKit items vs. Google Photos Cloud items
             if !toDelete.isEmpty {
-                try await deleteExecutor.executeBatchDeletion(assetIDs: toDelete.map(\.id))
+                let cloudItems = toDelete.filter { $0.id.hasPrefix("gphoto_") }
+                let localItems = toDelete.filter { !$0.id.hasPrefix("gphoto_") }
+
+                if !localItems.isEmpty {
+                    try await deleteExecutor.executeBatchDeletion(assetIDs: localItems.map(\.id))
+                }
+
+                var googleAlbumURL: URL?
+                if !cloudItems.isEmpty {
+                    googleAlbumURL = try await GooglePhotosCloudService.shared.commitCloudTrashItems(
+                        assetIDs: cloudItems.map(\.id)
+                    )
+                }
+
                 let updatedStats = try await ledger.finalizeBatchDeletion(deletedItems: toDelete)
                 let reclaimedBytes = toDelete.reduce(0) { $0 + $1.fileSizeBytes }
 
@@ -173,7 +204,9 @@ public final class TrashStagingViewModel {
                 latestCommitReceipt = BatchCommitReceipt(
                     deletedCount: toDelete.count,
                     reclaimedBytes: reclaimedBytes,
-                    updatedLifetimeStats: updatedStats
+                    updatedLifetimeStats: updatedStats,
+                    googlePhotosTrashAlbumURL: googleAlbumURL,
+                    cloudStagedCount: cloudItems.count
                 )
                 onComplete?()
             } else {

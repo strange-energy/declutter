@@ -42,10 +42,21 @@ public final class AssetPrefetchPipeline {
 
         let start = currentIndex
         let end = min(deck.count - 1, currentIndex + lookaheadCount)
-        let windowIDs = Set(deck[start...end].map(\.id))
+        let windowSlice = deck[start...end]
 
-        let idsToStart = Array(windowIDs.subtracting(currentlyCachedIDs))
-        let idsToStop = Array(currentlyCachedIDs.subtracting(windowIDs))
+        // Pre-warm remote Google Photos assets in the lookahead window
+        for asset in windowSlice where asset.isGooglePhotoAsset {
+            GooglePhotosCloudService.shared.requestRemoteImage(
+                for: asset.id,
+                pixelWidth: Int(screenTargetSize.width),
+                pixelHeight: Int(screenTargetSize.height)
+            ) { _ in }
+        }
+
+        let localWindowIDs = Set(windowSlice.filter { !$0.isGooglePhotoAsset }.map(\.id))
+
+        let idsToStart = Array(localWindowIDs.subtracting(currentlyCachedIDs))
+        let idsToStop = Array(currentlyCachedIDs.subtracting(localWindowIDs))
 
         let targetSize = screenTargetSize
         let options = defaultCachingOptions
@@ -70,7 +81,7 @@ public final class AssetPrefetchPipeline {
             )
         }
 
-        currentlyCachedIDs = windowIDs
+        currentlyCachedIDs = localWindowIDs
     }
 
     public func stopCachingAll() {
@@ -86,6 +97,15 @@ public final class AssetPrefetchPipeline {
         highResolutionForZoom: Bool = false,
         onUpdate: @escaping @MainActor (UIImage?, Bool) -> Void
     ) -> PHImageRequestID? {
+        if assetID.hasPrefix("gphoto_") {
+            let w = highResolutionForZoom ? 2560 : Int(screenTargetSize.width)
+            let h = highResolutionForZoom ? 2560 : Int(screenTargetSize.height)
+            GooglePhotosCloudService.shared.requestRemoteImage(for: assetID, pixelWidth: w, pixelHeight: h) { img in
+                onUpdate(img, false)
+            }
+            return nil
+        }
+
         let fetched = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil)
         guard let phAsset = fetched.firstObject else {
             onUpdate(nil, false)
@@ -120,6 +140,18 @@ public final class AssetPrefetchPipeline {
         pointSize: CGSize = CGSize(width: 140, height: 140),
         onResult: @escaping @MainActor (UIImage?) -> Void
     ) -> PHImageRequestID? {
+        if assetID.hasPrefix("gphoto_") {
+            let scale = Int(UIScreen.main.scale)
+            GooglePhotosCloudService.shared.requestRemoteImage(
+                for: assetID,
+                pixelWidth: Int(pointSize.width) * scale,
+                pixelHeight: Int(pointSize.height) * scale
+            ) { img in
+                onResult(img)
+            }
+            return nil
+        }
+
         let fetched = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil)
         guard let phAsset = fetched.firstObject else {
             onResult(nil)
