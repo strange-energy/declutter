@@ -93,9 +93,11 @@ public final class DeckSessionViewModel {
 
         let fetchedAssets = await queryService.buildDeck(for: filter, excludedAssetIDs: excludedIDs)
 
-        // Restore saved session checkpoint order if available and valid
-        if let checkpoint = try? await ledger.loadDeckCheckpoint(deckKey: filter.id),
-           !checkpoint.orderedIDs.isEmpty {
+        // Restore saved session checkpoint order if available and valid (and not already finished)
+        if !includePreviouslyKept,
+           let checkpoint = try? await ledger.loadDeckCheckpoint(deckKey: filter.id),
+           !checkpoint.orderedIDs.isEmpty,
+           checkpoint.currentIndex < fetchedAssets.count {
             let assetByID = Dictionary(uniqueKeysWithValues: fetchedAssets.map { ($0.id, $0) })
             var restored: [MediaAsset] = []
             var seen = Set<String>()
@@ -118,6 +120,14 @@ public final class DeckSessionViewModel {
         isLoading = false
         prefetchPipeline.updatePrefetchWindow(deck: deck, currentIndex: currentIndex)
         refreshTopCardMetadataIfNeeded()
+    }
+
+    /// Reloads the current deck including previously kept photos so the user can re-triage a finished month/album in one tap.
+    public func reloadIncludingKeptPhotos() async {
+        includePreviouslyKept = true
+        undoStack.removeAll()
+        try? await ledger.clearDeckCheckpoint(deckKey: filter.id)
+        await loadSession()
     }
 
     // MARK: - 4-Way Gesture Execution (PRD Section 3.1)

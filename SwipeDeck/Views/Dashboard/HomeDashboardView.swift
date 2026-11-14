@@ -485,8 +485,13 @@ private struct MonthBucketCardView: View {
                         .foregroundStyle(.white)
                         .lineLimit(1)
 
-                    Text("\(summary.unreviewedCount) photos")
-                        .exifMonoStyle(size: 11, color: SwipeDeckTheme.accentKeep)
+                    if summary.unreviewedCount == 0 {
+                        Label("All Reviewed", systemImage: "checkmark.circle.fill")
+                            .exifMonoStyle(size: 11, color: SwipeDeckTheme.accentKeep)
+                    } else {
+                        Text("\(summary.unreviewedCount) left • \(summary.totalCount) total")
+                            .exifMonoStyle(size: 11, color: SwipeDeckTheme.accentKeep)
+                    }
                 }
                 .padding(12)
             }

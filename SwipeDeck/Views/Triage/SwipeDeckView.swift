@@ -241,6 +241,29 @@ public struct SwipeDeckView: View {
             }
 
             Button {
+                Task {
+                    await sessionVM.reloadIncludingKeptPhotos()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.counterclockwise")
+                    Text("Review Kept Photos Again")
+                        .font(SwipeDeckTypography.roundedHeadline(15, weight: .bold))
+                }
+                .foregroundStyle(SwipeDeckTheme.textPrimary)
+                .padding(.horizontal, 22)
+                .padding(.vertical, 13)
+                .background(
+                    Capsule()
+                        .fill(SwipeDeckTheme.surfaceSecondary)
+                        .overlay(
+                            Capsule().strokeBorder(SwipeDeckTheme.borderSubtle, lineWidth: 1)
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+
+            Button {
                 dismiss()
             } label: {
                 Text("Back to Decks")
