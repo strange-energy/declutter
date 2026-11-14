@@ -91,7 +91,16 @@ public final class DeckSessionViewModel {
             excludedIDs.formUnion(reviewed.kept)
         }
 
-        let fetchedAssets = await queryService.buildDeck(for: filter, excludedAssetIDs: excludedIDs)
+        var fetchedAssets = await queryService.buildDeck(for: filter, excludedAssetIDs: excludedIDs)
+
+        // If all non-trashed photos in this deck were already reviewed (marked Kept),
+        // automatically fall back to loading all non-trashed photos in the deck so re-entering
+        // a completed month/album immediately shows its photos from card 1.
+        if fetchedAssets.isEmpty && !includePreviouslyKept {
+            includePreviouslyKept = true
+            try? await ledger.clearDeckCheckpoint(deckKey: filter.id)
+            fetchedAssets = await queryService.buildDeck(for: filter, excludedAssetIDs: reviewed.stagedTrash)
+        }
 
         // Restore saved session checkpoint order if available and valid (and not already finished)
         if !includePreviouslyKept,
@@ -122,10 +131,11 @@ public final class DeckSessionViewModel {
         refreshTopCardMetadataIfNeeded()
     }
 
-    /// Reloads the current deck including previously kept photos so the user can re-triage a finished month/album in one tap.
+    /// Restarts the current deck from the very first photo (including any previously kept photos).
     public func reloadIncludingKeptPhotos() async {
         includePreviouslyKept = true
         undoStack.removeAll()
+        currentIndex = 0
         try? await ledger.clearDeckCheckpoint(deckKey: filter.id)
         await loadSession()
     }

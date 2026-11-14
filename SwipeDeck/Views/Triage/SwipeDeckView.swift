@@ -115,11 +115,28 @@ public struct SwipeDeckView: View {
 
                 Spacer()
 
-                // Deck Progress Counter (e.g., 142 / 300)
+                // Deck Progress Counter (e.g., 142 / 300) + Restart Deck button
                 if !sessionVM.isLoading && sessionVM.totalCount > 0 {
-                    Text("\(sessionVM.progressDisplayIndex) / \(sessionVM.totalCount)")
-                        .roundedStatStyle(size: 13, color: SwipeDeckTheme.textSecondary)
-                        .contentTransition(.numericText())
+                    HStack(spacing: 8) {
+                        Text("\(sessionVM.progressDisplayIndex) / \(sessionVM.totalCount)")
+                            .roundedStatStyle(size: 13, color: SwipeDeckTheme.textSecondary)
+                            .contentTransition(.numericText())
+
+                        Button {
+                            HapticEngine.shared.fireUtilityCommit()
+                            Task {
+                                await sessionVM.reloadIncludingKeptPhotos()
+                            }
+                        } label: {
+                            Image(systemName: "arrow.counterclockwise")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(SwipeDeckTheme.textSecondary)
+                                .frame(width: 26, height: 26)
+                                .background(SwipeDeckTheme.surfaceElevated, in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Restart Deck from Beginning")
+                    }
                 }
 
                 Spacer()
