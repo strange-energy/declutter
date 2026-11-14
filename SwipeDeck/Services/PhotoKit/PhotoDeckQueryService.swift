@@ -44,7 +44,7 @@ public final class PhotoDeckQueryService: Sendable {
                 var candidates: [PHAsset] = []
                 candidates.reserveCapacity(scanCap)
 
-                for idx in 0..< count {
+                for idx in 0..<count {
                     if candidates.count >= scanCap { break }
                     let asset = phAssets.object(at: idx)
                     if !excludedAssetIDs.contains(asset.localIdentifier) {
