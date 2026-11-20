@@ -201,7 +201,7 @@ public struct GooglePhotosBrowserSheet: View {
                     folderURLString: webController.currentURLString,
                     items: webController.capturedItems
                 )
-                HapticEngine.shared.fireKeepSnap()
+                HapticEngine.shared.fireKeepCommit()
                 onFolderImported(filter)
                 dismiss()
             } label: {
