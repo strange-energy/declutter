@@ -88,6 +88,14 @@ public struct HomeDashboardView: View {
             .sheet(isPresented: $isShowingSettingsSheet) {
                 dashboardSettingsSheet
             }
+            .sheet(isPresented: $googleService.isPresentingBrowserSheet) {
+                GooglePhotosBrowserSheet(
+                    initialMode: googleService.launchBrowserInDeletionAssistantMode ? .deletionAssistant : .folderPicker
+                ) { importedFilter in
+                    googleService.launchBrowserInDeletionAssistantMode = false
+                    selectedDeckFilter = importedFilter
+                }
+            }
             .fullScreenCover(item: $trashVM.latestCommitReceipt) { receipt in
                 StorageCelebrationView(receipt: receipt) {
                     trashVM.latestCommitReceipt = nil
@@ -329,29 +337,52 @@ public struct HomeDashboardView: View {
                             .exifMonoStyle(size: 11, color: SwipeDeckTheme.accentDefer)
                         Spacer()
                         Button {
-                            Task { await googleService.fetchAlbums() }
+                            googleService.launchBrowserInDeletionAssistantMode = false
+                            googleService.isPresentingBrowserSheet = true
                         } label: {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(SwipeDeckTheme.textSecondary)
+                            Label("Pick Cloud Folder", systemImage: "plus.circle.fill")
+                                .font(SwipeDeckTypography.roundedHeadline(12, weight: .bold))
+                                .foregroundStyle(SwipeDeckTheme.accentDefer)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    if !googleService.stagedForDeletionItems.isEmpty {
+                        Button {
+                            googleService.launchBrowserInDeletionAssistantMode = true
+                            googleService.isPresentingBrowserSheet = true
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "trash.circle.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(SwipeDeckTheme.accentDelete)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("\(googleService.stagedForDeletionItems.count) Cloud Photos Ready to Delete")
+                                        .font(SwipeDeckTypography.roundedHeadline(14, weight: .bold))
+                                        .foregroundStyle(SwipeDeckTheme.textPrimary)
+                                    Text("Tap to step through & delete them in Google Photos")
+                                        .font(SwipeDeckTypography.body(12))
+                                        .foregroundStyle(SwipeDeckTheme.textSecondary)
+                                }
+                                Spacer()
+                                Image(systemName: "arrow.up.right.circle.fill")
+                                    .foregroundStyle(SwipeDeckTheme.accentDelete)
+                            }
+                            .padding(14)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(SwipeDeckTheme.accentDelete.opacity(0.14))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                            .strokeBorder(SwipeDeckTheme.accentDelete.opacity(0.45), lineWidth: 1)
+                                    )
+                            )
                         }
                         .buttonStyle(.plain)
                     }
 
                     LazyVGrid(columns: gridColumns, spacing: 12) {
-                        // Main Google Photos Cloud Stream card
-                        DeckSummaryCardView(
-                            summary: DeckSummaryItem(
-                                filter: .googlePhotosAll,
-                                unreviewedCount: 100,
-                                totalCount: 100,
-                                coverAssetID: nil
-                            )
-                        ) {
-                            selectedDeckFilter = .googlePhotosAll
-                        }
-
-                        // Individual Google Photos Albums/Folders
+                        // Individual Google Photos Albums/Folders imported by the user
                         ForEach(googleService.albums) { gAlbum in
                             DeckSummaryCardView(
                                 summary: DeckSummaryItem(
@@ -388,17 +419,18 @@ public struct HomeDashboardView: View {
                 }
             }
 
-            // 3. Subtle non-intrusive link if not connected
+            // 3. Direct 1-tap Google Photos Folder Picker button if not connected
             if !googleService.isConnected {
                 Button {
-                    isShowingSettingsSheet = true
+                    googleService.launchBrowserInDeletionAssistantMode = false
+                    googleService.isPresentingBrowserSheet = true
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: "cloud.fill")
                             .foregroundStyle(SwipeDeckTheme.accentDefer)
-                        Text("Have cloud-only Google Photos? Connect in Settings")
-                            .font(SwipeDeckTypography.body(13))
-                            .foregroundStyle(SwipeDeckTheme.textSecondary)
+                        Text("Connect Google Photos & Pick a Cloud Folder")
+                            .font(SwipeDeckTypography.roundedHeadline(13, weight: .semibold))
+                            .foregroundStyle(SwipeDeckTheme.textPrimary)
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.caption)
@@ -460,7 +492,7 @@ public struct HomeDashboardView: View {
                     .padding(16)
                     .background(SwipeDeckTheme.surfaceElevated, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
 
-                    // Optional Google Photos Cloud Companion Card (Non-intrusive, inside Settings)
+                    // Optional Google Photos Cloud Companion Card (Zero OAuth Client ID needed)
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Image(systemName: "cloud.fill")
@@ -478,67 +510,21 @@ public struct HomeDashboardView: View {
                             }
                         }
 
-                        Text("Connect to browse Google Photos folders and stage cloud-only items into '\(GooglePhotosCloudService.stagingAlbumTitle)' for rapid cleanup.")
+                        Text("Sign in with your Google Account to pick any Google Photos folder, swipe it in SwipeDeck, and stage dismissed photos into '\(GooglePhotosCloudService.stagingAlbumTitle)'.")
                             .font(SwipeDeckTypography.body(12))
                             .foregroundStyle(SwipeDeckTheme.textSecondary)
 
-                        if googleService.isConnected {
-                            HStack(spacing: 12) {
-                                Button {
-                                    isShowingSettingsSheet = false
-                                    activeTab = .albums
-                                } label: {
-                                    Text("Browse Cloud Folders (\(googleService.albums.count))")
-                                        .font(SwipeDeckTypography.roundedHeadline(14, weight: .bold))
-                                        .foregroundStyle(.black)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 11)
-                                        .background(SwipeDeckTheme.accentKeep, in: Capsule())
-                                }
-                                .buttonStyle(.plain)
-
-                                Button {
-                                    googleService.disconnectAccount()
-                                } label: {
-                                    Text("Disconnect")
-                                        .font(SwipeDeckTypography.roundedHeadline(14, weight: .semibold))
-                                        .foregroundStyle(SwipeDeckTheme.accentDelete)
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 11)
-                                        .background(SwipeDeckTheme.surfaceSecondary, in: Capsule())
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        } else {
-                            TextField("iOS Google OAuth Client ID", text: $googleService.clientID)
-                                .exifMonoStyle(size: 12, color: SwipeDeckTheme.textPrimary)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                                .padding(12)
-                                .background(SwipeDeckTheme.surfaceSecondary, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-
-                            if let statusMsg = googleService.statusMessage {
-                                Text(statusMsg)
-                                    .font(SwipeDeckTypography.body(11))
-                                    .foregroundStyle(SwipeDeckTheme.accentDelete)
-                            }
-
+                        HStack(spacing: 10) {
                             Button {
-                                Task {
-                                    do {
-                                        try await googleService.signInWithGoogle()
-                                    } catch {
-                                        googleService.statusMessage = error.localizedDescription
-                                    }
+                                isShowingSettingsSheet = false
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                    googleService.launchBrowserInDeletionAssistantMode = false
+                                    googleService.isPresentingBrowserSheet = true
                                 }
                             } label: {
-                                HStack(spacing: 8) {
-                                    if googleService.isAuthenticating {
-                                        ProgressView().tint(.white)
-                                    } else {
-                                        Image(systemName: "person.badge.key.fill")
-                                    }
-                                    Text("Connect Google Photos Account")
+                                HStack(spacing: 6) {
+                                    Image(systemName: "folder.fill.badge.person.crop")
+                                    Text(googleService.isConnected ? "Pick Google Photos Folder" : "Sign In to Google Photos")
                                         .font(SwipeDeckTypography.roundedHeadline(14, weight: .bold))
                                 }
                                 .foregroundStyle(.white)
@@ -547,7 +533,35 @@ public struct HomeDashboardView: View {
                                 .background(SwipeDeckTheme.accentDefer, in: Capsule())
                             }
                             .buttonStyle(.plain)
-                            .disabled(googleService.isAuthenticating)
+
+                            if googleService.isConnected {
+                                Button {
+                                    googleService.disconnectAccount()
+                                } label: {
+                                    Text("Sign Out")
+                                        .font(SwipeDeckTypography.roundedHeadline(13, weight: .semibold))
+                                        .foregroundStyle(SwipeDeckTheme.accentDelete)
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 12)
+                                        .background(SwipeDeckTheme.surfaceSecondary, in: Capsule())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+
+                        if !googleService.isConnected {
+                            Button {
+                                googleService.loadSampleCloudFolders()
+                                isShowingSettingsSheet = false
+                                activeTab = .albums
+                            } label: {
+                                Text("Or Try Sample Cloud Folders (No Sign-In Needed)")
+                                    .font(SwipeDeckTypography.roundedHeadline(12, weight: .semibold))
+                                    .foregroundStyle(SwipeDeckTheme.accentKeep)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 8)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                     .padding(16)

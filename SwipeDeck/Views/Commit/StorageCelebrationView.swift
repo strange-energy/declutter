@@ -79,13 +79,17 @@ public struct StorageCelebrationView: View {
 
                 Spacer()
 
-                if let googleURL = receipt.googlePhotosTrashAlbumURL, receipt.cloudStagedCount > 0 {
+                if receipt.cloudStagedCount > 0 {
                     Button {
-                        UIApplication.shared.open(googleURL)
+                        onDismiss()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                            GooglePhotosCloudService.shared.launchBrowserInDeletionAssistantMode = true
+                            GooglePhotosCloudService.shared.isPresentingBrowserSheet = true
+                        }
                     } label: {
                         HStack(spacing: 8) {
-                            Image(systemName: "arrow.up.right.square.fill")
-                            Text("Open '\(GooglePhotosCloudService.stagingAlbumTitle)' in Google Photos")
+                            Image(systemName: "trash.circle.fill")
+                            Text("Delete These \(receipt.cloudStagedCount) Cloud Photos in Google Photos")
                                 .font(SwipeDeckTypography.roundedHeadline(14, weight: .bold))
                         }
                         .foregroundStyle(SwipeDeckTheme.accentDefer)
